@@ -1,0 +1,6 @@
+requests
+Pillow
+pandas
+zhconv
+cloudinary
+brotli

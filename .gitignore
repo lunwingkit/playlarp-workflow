@@ -1,0 +1,8 @@
+#.Ignore sensitive configuration file
+config.py
+
+# Ignore output and log directories
+downloaded/
+output_raw/
+output_translated/
+log/
