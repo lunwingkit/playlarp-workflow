@@ -5,19 +5,16 @@ import os
 import logging
 
 def translate_csv(input_csv, output_csv):
-    """Translate CSV content to Traditional Chinese."""
     if not os.path.exists(input_csv):
         logging.error(f"Input file {input_csv} not found.")
         return
 
-    custom_mappings = {}
     df = pd.read_csv(input_csv, quoting=csv.QUOTE_ALL)
-    # Use DataFrame.apply instead of applymap to avoid FutureWarning
     df_translated = df.apply(lambda col: col.map(lambda x: zhconv.convert(str(x), 'zh-hant') if isinstance(x, str) else x))
     os.makedirs(os.path.dirname(output_csv), exist_ok=True)
     df_translated.to_csv(output_csv, index=False, quoting=csv.QUOTE_ALL)
     logging.info(f"Translated {input_csv} to {output_csv}")
-
+    
 def sort_csv_by_script_id(csv_path):
     """Sort CSV by scriptId in ascending order."""
     if not os.path.exists(csv_path):

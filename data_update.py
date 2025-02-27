@@ -1,8 +1,8 @@
 import csv
 import os
-from datetime import datetime
 import config
 import logging
+import time
 
 def read_csv(file_path):
     """Read CSV into a list of dictionaries."""
@@ -15,7 +15,7 @@ def read_csv(file_path):
 def write_csv(file_path, data, fieldnames):
     """Write data to CSV with given fieldnames."""
     with open(file_path, 'w', newline='', encoding='utf-8') as f:
-        writer = csv.DictWriter(f, fieldnames=fieldnames)
+        writer = csv.DictWriter(f, fieldnames=fieldnames, extrasaction='ignore')
         writer.writeheader()
         writer.writerows(data)
 
@@ -24,11 +24,11 @@ def sort_csv_by_script_id(file_path):
     data = read_csv(file_path)
     if data:
         data.sort(key=lambda x: int(x['scriptId']) if x['scriptId'].isdigit() else x['scriptId'])
-        write_csv(file_path, data, data[0].keys())
+        fieldnames = ['scriptId', 'scriptName'] + [key for key in data[0].keys() if key not in ['scriptId', 'scriptName']]
+        write_csv(file_path, data, fieldnames)
         logging.info(f"Sorted {file_path} by scriptId")
 
 def update_script_list(new_data, mode='full'):
-    """Update script_data.csv and return the number of new records inserted."""
     script_list_path = config.SCRIPT_LIST_PATH
     inserted_count = 0
     
@@ -36,30 +36,34 @@ def update_script_list(new_data, mode='full'):
         logging.info("No new script data to update.")
         return inserted_count
     
+    current_time = int(time.time())
     if mode == 'incremental':
-        existing_data = {row['scriptId'] for row in read_csv(script_list_path)}
-        new_entries = [row for row in new_data if row['scriptId'] not in existing_data]
-        inserted_count = len(new_entries)
-        if new_entries:
-            all_data = read_csv(script_list_path) + new_entries
-            write_csv(script_list_path, all_data, new_data[0].keys())
-            sort_csv_by_script_id(script_list_path)
-            # Save incremental data
-            timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
-            incremental_dir = os.path.join(config.OUTPUT_FOLDER_PATH, timestamp)
-            os.makedirs(incremental_dir, exist_ok=True)
-            incremental_path = os.path.join(incremental_dir, 'script_data.csv')
-            write_csv(incremental_path, new_entries, new_data[0].keys())
-            logging.info(f"Incremental script list saved to {incremental_path}")
+        existing_data = {row['scriptId']: row for row in read_csv(script_list_path)}
+        new_entries = []
+        for row in new_data:
+            script_id = row['scriptId']
+            if script_id not in existing_data:
+                row['databaseInserted'] = 'False'  # Set for new entries
+                new_entries.append(row)
+                inserted_count += 1
+            else:
+                existing_row = existing_data[script_id]
+                existing_row['scriptName'] = row['scriptName']
+                # Preserve flags including databaseInserted
+        all_data = list(existing_data.values()) + [row for row in new_entries if row['scriptId'] not in existing_data]
     else:
-        write_csv(script_list_path, new_data, new_data[0].keys())
-        sort_csv_by_script_id(script_list_path)
-        inserted_count = len(new_data)  # In full mode, all records are "inserted"
+        all_data = [dict(row, databaseInserted='False') for row in new_data]  # All new with False
+        inserted_count = len(new_data)
     
+    if all_data:
+        fieldnames = ['scriptId', 'scriptName', 'firstFetchAt', 'lastModifiedAt',
+                      'coverImageDownloaded', 'imageContentDownloaded',
+                      'coverImageUploaded', 'imageContentUploaded', 'databaseInserted']
+        write_csv(script_list_path, all_data, fieldnames)
+        sort_csv_by_script_id(script_list_path)
     return inserted_count
 
 def update_script_details(new_details, mode='full'):
-    """Update script_data_detailed.csv and return the number of new records inserted."""
     detailed_csv_path = config.DETAILED_CSV_PATH
     inserted_count = 0
     
@@ -67,30 +71,52 @@ def update_script_details(new_details, mode='full'):
         logging.info("No new script details to update.")
         return inserted_count
     
+    current_time = int(time.time())
     if mode == 'incremental':
         existing_data = {row['scriptId']: row for row in read_csv(detailed_csv_path)}
         new_entries = []
         for detail in new_details:
             script_id = detail['scriptId']
             if script_id not in existing_data:
-                existing_data[script_id] = detail
+                detail['firstFetchAt'] = current_time
                 new_entries.append(detail)
                 inserted_count += 1
-        if existing_data:  # If there's existing data, use its keys
-            write_csv(detailed_csv_path, list(existing_data.values()), list(existing_data.values())[0].keys())
-        else:  # Otherwise, use new_details keys
-            write_csv(detailed_csv_path, new_entries, new_details[0].keys())
-        sort_csv_by_script_id(detailed_csv_path)
-        if new_entries:
-            timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
-            incremental_dir = os.path.join(config.OUTPUT_FOLDER_PATH, timestamp)
-            os.makedirs(incremental_dir, exist_ok=True)
-            incremental_path = os.path.join(incremental_dir, 'script_data_detailed.csv')
-            write_csv(incremental_path, new_entries, new_details[0].keys())
-            logging.info(f"Incremental detailed data saved to {incremental_path}")
+            else:
+                existing_row = existing_data[script_id]
+                existing_row.update(detail)
+                existing_row['lastModifiedAt'] = current_time
+                existing_row['firstFetchAt'] = existing_row.get('firstFetchAt', current_time)
+        all_data = list(existing_data.values()) + [row for row in new_entries if row['scriptId'] not in existing_data]
     else:
-        write_csv(detailed_csv_path, new_details, new_details[0].keys())
-        sort_csv_by_script_id(detailed_csv_path)
-        inserted_count = len(new_details)  # In full mode, all records are "inserted"
+        all_data = new_details
+        inserted_count = len(new_details)
     
+    if all_data:
+        fieldnames = ['scriptId', 'scriptName', 'firstFetchAt', 'lastModifiedAt', 'scriptCoverUrl', 'scriptImageContent']
+        write_csv(detailed_csv_path, all_data, fieldnames)
+        sort_csv_by_script_id(detailed_csv_path)
     return inserted_count
+
+def update_script_list_flags(updated_data):
+    script_list_path = config.SCRIPT_LIST_PATH
+    current_data = {row['scriptId']: row for row in read_csv(script_list_path)}
+    
+    flag_fields = ['coverImageDownloaded', 'imageContentDownloaded', 'coverImageUploaded', 'imageContentUploaded', 'databaseInserted']
+    
+    for item in updated_data:
+        script_id = item['scriptId']
+        if script_id in current_data:
+            current_row = current_data[script_id]
+            for field in flag_fields:
+                if field in item and current_row.get(field) != 'True':
+                    current_row[field] = str(item[field])
+            # Preserve firstFetchAt, lastModifiedAt unchanged here
+
+    all_data = list(current_data.values())
+    if all_data:
+        fieldnames = ['scriptId', 'scriptName', 'firstFetchAt', 'lastModifiedAt',
+                      'coverImageDownloaded', 'imageContentDownloaded',
+                      'coverImageUploaded', 'imageContentUploaded', 'databaseInserted']
+        write_csv(script_list_path, all_data, fieldnames)
+        sort_csv_by_script_id(script_list_path)
+    logging.info(f"Updated flags in {script_list_path}")

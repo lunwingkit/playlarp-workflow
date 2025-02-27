@@ -1,0 +1,628 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+// Looking for ways to speed up your queries, or scale easily with your serverless or edge functions?
+// Try Prisma Accelerate: https://pris.ly/cli/accelerate-init
+
+generator client {
+  provider = "prisma-client-py"
+  enable_experimental_decimal = true
+}
+
+datasource db {
+  provider = "cockroachdb"
+  url      = env("DATABASE_URL")
+}
+
+model SyncToken {
+  syncToken  String
+  createTime DateTime
+  calendarId String   @default("")
+
+  @@unique([syncToken, calendarId])
+}
+
+model Account {
+  id                String   @id @default(cuid())
+  userId            String
+  type              String
+  provider          String
+  providerAccountId String
+  refresh_token     String?
+  access_token      String?
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String?
+  session_state     String?
+  createTime        DateTime @default(now())
+  user              User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+}
+
+model Session {
+  id           String   @id @default(cuid())
+  sessionToken String   @unique
+  userId       String
+  expires      DateTime
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model User {
+  id                     String                  @id @default(cuid())
+  name                   String?
+  email                  String?                 @unique
+  emailVerified          DateTime?
+  phoneNumber            String?                 @unique
+  image                  String?
+  customerId             String?
+  createTime             DateTime                @default(now())
+  role                   String                  @default("")
+  accounts               Account[]
+  sessions               Session[]
+  nickname               String?
+  gender                 String?
+  birthdate              DateTime?
+  remark                 String                  @default("")
+  tags                   String[]                @default([])
+  isDM                   Boolean                 @default(false)
+  primaryContactGateway  String                  @default("")
+  primaryContactUserID   String                  @default("")
+  primaryContactUserName String                  @default("")
+  contacts               Contact[]
+  larpSessionsPlayed     PlayersInLARPSessions[]
+  larpSessionsLed        DMsInLARPSessions[]
+  rolesInLARPShops       RolesInLARPShops[]
+  coupons                Coupon[]
+  stampCards             StampCard[]
+  userDeviceInfos        UserDeviceInfo[]
+  Comment                Comment[]
+  CommentsLikedByUsers   CommentsLikedByUsers[]
+}
+
+model UserDeviceInfo {
+  id         String   @id @default(cuid())
+  userId     String
+  user       User     @relation(fields: [userId], references: [id])
+  deviceHash String
+  ipAddress  String?
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+}
+
+model Contact {
+  id             String   @id @default(cuid())
+  gateway        String
+  userId         String
+  userName       String
+  lastUpdateTime DateTime @updatedAt
+  lastUpdateBy   String   @default("SYS")
+  lastUpdateCode String   @default("I")
+  createTime     DateTime @default(now())
+  user           User     @relation(fields: [userId], references: [id])
+}
+
+model Merchant {
+  id               String    @id @default(cuid())
+  seqNo            Int       @unique @default(sequence())
+  name             String    @unique
+  openTime         DateTime?
+  registrationTime DateTime?
+  features         Json?
+  isPartyRoom      Boolean   @default(false)
+  isBoardGameShop  Boolean   @default(false)
+  isLarpShop       Boolean   @default(false)
+
+  instagramId            String @default("")
+  instagramName          String @default("")
+  whatsappGroupInviteUrl String @default("")
+  homePageUrl            String @default("")
+  mainAddress            String @default("")
+
+  mqShopId String? @unique
+  logoUrl  String?
+
+  createTime     DateTime                           @default(now())
+  createBy       String                             @default("SYS")
+  lastUpdateTime DateTime                           @updatedAt
+  lastUpdateBy   String                             @default("SYS")
+  lastUpdateCode String                             @default("I")
+  larpShops      LARPShopsManagedByMerchants[]
+  partyRooms     PartyRoomsManagedByMerchants[]
+  boardGameShops BoardGameShopsManagedByMerchants[]
+}
+
+model LARPShop {
+  id    String @id @default(cuid())
+  seqNo Int    @unique @default(sequence())
+  name  String @unique
+
+  address          String   @default("")
+  longitude        Decimal?
+  latitude         Decimal?
+  score            Decimal  @default(5)
+  weekdayPlayPrice Int      @default(0)
+  holidayPlayPrice Int      @default(0)
+  hotValue         Int      @default(0)
+
+  createTime        DateTime                      @default(now())
+  createBy          String                        @default("SYS")
+  lastUpdateTime    DateTime                      @updatedAt
+  lastUpdateBy      String                        @default("SYS")
+  lastUpdateCode    String                        @default("I")
+  managingMerchants LARPShopsManagedByMerchants[]
+  larpSession       LARPSession[]
+  larpScriptsOwned  LARPScriptsOwnedByLARPShops[]
+  rolesInLARPShops  RolesInLARPShops[]
+  Comment           Comment[]
+}
+
+model LARPShopsManagedByMerchants {
+  id             String   @id @default(cuid())
+  larpShopId     String
+  merchantId     String
+  createTime     DateTime @default(now())
+  createBy       String   @default("SYS")
+  lastUpdateTime DateTime @updatedAt
+  lastUpdateBy   String   @default("SYS")
+  lastUpdateCode String   @default("I")
+  larpShop       LARPShop @relation(fields: [larpShopId], references: [id])
+  merchant       Merchant @relation(fields: [merchantId], references: [id])
+}
+
+model PartyRoom {
+  id                String                         @id @default(cuid())
+  seqNo             Int                            @unique @default(sequence())
+  createTime        DateTime                       @default(now())
+  createBy          String                         @default("SYS")
+  lastUpdateTime    DateTime                       @updatedAt
+  lastUpdateBy      String                         @default("SYS")
+  lastUpdateCode    String                         @default("I")
+  managingMerchants PartyRoomsManagedByMerchants[]
+}
+
+model PartyRoomsManagedByMerchants {
+  id             String    @id @default(cuid())
+  partyRoomId    String
+  merchantId     String
+  createTime     DateTime  @default(now())
+  createBy       String    @default("SYS")
+  lastUpdateTime DateTime  @updatedAt
+  lastUpdateBy   String    @default("SYS")
+  lastUpdateCode String    @default("I")
+  partyRoom      PartyRoom @relation(fields: [partyRoomId], references: [id])
+  merchant       Merchant  @relation(fields: [merchantId], references: [id])
+}
+
+model BoardGameShop {
+  id                String                             @id @default(cuid())
+  seqNo             Int                                @unique @default(sequence())
+  createTime        DateTime                           @default(now())
+  createBy          String                             @default("SYS")
+  lastUpdateTime    DateTime                           @updatedAt
+  lastUpdateBy      String                             @default("SYS")
+  lastUpdateCode    String                             @default("I")
+  managingMerchants BoardGameShopsManagedByMerchants[]
+}
+
+model BoardGameShopsManagedByMerchants {
+  id              String        @id @default(cuid())
+  boardGameShopId String
+  merchantId      String
+  createTime      DateTime      @default(now())
+  createBy        String        @default("SYS")
+  lastUpdateTime  DateTime      @updatedAt
+  lastUpdateBy    String        @default("SYS")
+  lastUpdateCode  String        @default("I")
+  boardGameShop   BoardGameShop @relation(fields: [boardGameShopId], references: [id])
+  merchant        Merchant      @relation(fields: [merchantId], references: [id])
+}
+
+model RolesInLARPShops {
+  id             String   @id @default(cuid())
+  larpShopId     String
+  userId         String
+  role           String
+  createTime     DateTime @default(now())
+  createBy       String   @default("SYS")
+  lastUpdateTime DateTime @updatedAt
+  lastUpdateBy   String   @default("SYS")
+  lastUpdateCode String   @default("I")
+  larpShop       LARPShop @relation(fields: [larpShopId], references: [id])
+  user           User     @relation(fields: [userId], references: [id])
+}
+
+model LARPScriptsOwnedByLARPShops {
+  id                           String     @id @default(cuid())
+  larpScriptId                 String
+  larpShopId                   String
+  isLatest                     Boolean?
+  isRecommended                Boolean?
+  isTreasure                   Boolean?
+  isWithClothes                Boolean?
+  isIgnoreGenderNotRecommended Boolean?
+  isOfficiallyAuthorized       Boolean?
+  isNotReady                   Boolean?
+  standardPrice                Decimal?
+  createTime                   DateTime   @default(now())
+  createBy                     String     @default("SYS")
+  lastUpdateTime               DateTime   @updatedAt
+  lastUpdateBy                 String     @default("SYS")
+  lastUpdateCode               String     @default("I")
+  larpScript                   LARPScript @relation(fields: [larpScriptId], references: [id])
+  larpShop                     LARPShop   @relation(fields: [larpShopId], references: [id])
+
+  @@unique([larpShopId, larpScriptId])
+}
+
+model LARPScriptIssuer {
+  id             String                       @id @default(cuid())
+  name           String                       @default("")
+  logoUrl        String?
+  intro          String
+  mqIssueUnitId  String                       @unique
+  wantCount      Int                          @default(0)
+  playedCount    Int                          @default(0)
+  influenceValue Int                          @default(0)
+  createTime     DateTime                     @default(now())
+  createBy       String                       @default("SYS")
+  lastUpdateTime DateTime                     @updatedAt
+  lastUpdateBy   String                       @default("SYS")
+  lastUpdateCode String                       @default("I")
+  scripts        LARPScriptsIssuedByIssuers[]
+}
+
+model LARPScriptsIssuedByIssuers {
+  id       String @id @default(cuid())
+  scriptId String
+  issuerId String
+
+  createTime     DateTime @default(now())
+  createBy       String   @default("SYS")
+  lastUpdateTime DateTime @updatedAt
+  lastUpdateBy   String   @default("SYS")
+  lastUpdateCode String   @default("I")
+
+  script LARPScript       @relation(fields: [scriptId], references: [id])
+  issuer LARPScriptIssuer @relation(fields: [issuerId], references: [id])
+
+  @@unique([scriptId, issuerId])
+}
+
+model LARPScriptAuthor {
+  id             String                        @id @default(cuid())
+  name           String                        @unique
+  createTime     DateTime                      @default(now())
+  createBy       String                        @default("SYS")
+  lastUpdateTime DateTime                      @updatedAt
+  lastUpdateBy   String                        @default("SYS")
+  lastUpdateCode String                        @default("I")
+  scripts        LARPScriptsWrittenByAuthors[]
+}
+
+model LARPScriptsWrittenByAuthors {
+  id       String @id @default(cuid())
+  scriptId String
+  authorId String
+
+  createTime     DateTime @default(now())
+  createBy       String   @default("SYS")
+  lastUpdateTime DateTime @updatedAt
+  lastUpdateBy   String   @default("SYS")
+  lastUpdateCode String   @default("I")
+
+  script LARPScript       @relation(fields: [scriptId], references: [id])
+  author LARPScriptAuthor @relation(fields: [authorId], references: [id])
+
+  @@unique([scriptId, authorId])
+}
+
+model LARPScript {
+  id                             String   @id @default(cuid())
+  seqNo                          Int?     @unique @default(sequence())
+  name                           String
+  description                    String   @default("")
+  imageUrl                       String   @default("")
+  isPlayerCountFixed             Boolean?
+  playerCount                    Int?
+  playerMaleCount                Int?
+  playerFemaleCount              Int?
+  playerCountMin                 Int?
+  playerCountMax                 Int?
+  isDurationFixed                Boolean?
+  durationInHour                 Decimal?
+  durationInHourMin              Decimal?
+  durationInHourMax              Decimal?
+  // 背景設定
+  isBackgroundJapanese           Boolean? // 日式
+  isBackgroundEuropean           Boolean? // 歐美
+  isBackgroundHongKongMacau      Boolean? // 港澳
+  isBackgroundChinese            Boolean? // 中式
+  isBackgroundFictional          Boolean? // 虛構
+  isBackgroundPartiallyFictional Boolean? // 架空
+  isBackgroundAncient            Boolean? // 古風
+  isBackgroundRepublicOfChina    Boolean? // 民國
+  isBackgroundFuturistic         Boolean? // 未來
+  isBackgroundModern             Boolean? // 現代
+  isBackgroundForeign            Boolean? // 國外
+  isBackgroundOthers             Boolean? // 其他
+
+  // 劇本類型
+  isScriptEmotional   Boolean? // 情感
+  isScriptMechanism   Boolean? // 機制
+  isScriptReasoning   Boolean? // 推理
+  isScriptDiscovering Boolean? // 還原
+  isScriptMultiSide   Boolean? // 陣營
+  isScriptFun         Boolean? // 歡樂
+  isScriptHorror      Boolean? // 恐怖
+
+  // 遊戲玩法
+  isGamePlayFun                Boolean? // 歡樂
+  isGamePlayHealing            Boolean? // 治癒
+  isGamePlayMeaningful         Boolean? // 立意
+  isGamePlayActing             Boolean? // 演繹
+  isGamePlayImmersive          Boolean? // 沉浸
+  isGamePlayEating             Boolean? // 食玩
+  isGamePlayTerror             Boolean? // 驚栗
+  isGamePlaySuspense           Boolean? // 懸疑
+  isGamePlayDeductiveReasoning Boolean? // 演繹法
+  isGamePlayGameTheory         Boolean? // 博奕
+  isGamePlaySetting            Boolean? // 設定
+  isGamePlayCrimeInvestigation Boolean? // 刑偵
+  isGamePlayTRPG               Boolean? // 跑團
+  isGamePlayOthers             Boolean? // 其他
+
+  // 題材
+  isThemeMythology          Boolean? // 神話
+  isThemeSciFi              Boolean? // 科幻
+  isThemeMartialArts        Boolean? // 武俠
+  isThemeWar                Boolean? // 戰爭
+  isThemeSchool             Boolean? // 校園
+  isThemeApocalypse         Boolean? // 末日
+  isThemeNation             Boolean? // 家國
+  isThemeAnimal             Boolean? // 動物
+  isThemeUrban              Boolean? // 都市
+  isThemeEliteFamily        Boolean? // 豪門
+  isThemePalace             Boolean? // 宮廷
+  isThemeGhostStory         Boolean? // 怪談
+  isThemeImmortalHero       Boolean? // 仙俠
+  isThemeFantasy            Boolean? // 玄幻
+  isThemeTimeTravel         Boolean? // 穿越
+  isThemeHistory            Boolean? // 歷史
+  isThemeAnthropomorphism   Boolean? // 擬人
+  isThemeCthulhu            Boolean? // 克蘇魯
+  isThemeAnime              Boolean? // 二次元
+  isThemeMagic              Boolean? // 魔法
+  isThemePhilosophical      Boolean? // 思辨
+  isThemePoliticalIntrigue  Boolean? // 權謀
+  isThemeRural              Boolean? // 鄉土
+  isThemeComingOfAge        Boolean? // 成長
+  isThemeCrimeInvestigation Boolean? // 刑偵
+  isThemeFairyTale          Boolean? // 童話
+
+  isReasoningHonKaku     Boolean?
+  isReasoningHenGaKu     Boolean?
+  isReasoningShinHonKaku Boolean?
+  isMurdererSelfAware    Boolean?
+  isMurdererBlind        Boolean?
+  isMurdererDMNPC        Boolean?
+  isLevelJunior          Boolean? // 新手
+  isLevelAdvanced        Boolean? // 进阶
+  isLevelSenior          Boolean? // 高阶
+  isSoldByBox            Boolean?
+  isSoldByCityMulti      Boolean?
+  isSoldByCitySolo       Boolean?
+  isShareBoxOffice       Boolean?
+  isWithMobile           Boolean?
+  isWithWeChat           Boolean?
+  otherTags              String[]
+
+  issueTime DateTime?
+  author    String[]
+  publisher String[]
+  platform  String    @default("")
+
+  mqScriptId           String?  @unique
+  mqCollectiveScore    Decimal?
+  mqScoreCount         Decimal?
+  mqInferenceScore     Decimal?
+  mqPlotScore          Decimal?
+  mqComplexScore       Decimal?
+  mqScriptImageContent String?
+  mqWantPlayerCount    Int?
+  playedCount          Int?
+
+  createTime           DateTime                      @default(now())
+  createBy             String                        @default("SYS")
+  lastUpdateTime       DateTime                      @updatedAt
+  lastUpdateBy         String                        @default("SYS")
+  lastUpdateCode       String                        @default("I")
+  larpSession          LARPSession[]
+  larpShopsOwning      LARPScriptsOwnedByLARPShops[]
+  larpScriptCharacters LarpScriptCharacter[]
+  issuers              LARPScriptsIssuedByIssuers[]
+  authors              LARPScriptsWrittenByAuthors[]
+  Comment              Comment[]
+}
+
+model LarpScriptCharacter {
+  id           String     @id @default(cuid())
+  larpScriptId String
+  imageUrl     String     @default("")
+  name         String?
+  gender       String?
+  age          Int?
+  larpScript   LARPScript @relation(fields: [larpScriptId], references: [id])
+  Comment      Comment[]
+}
+
+model LARPSession {
+  id                    String                  @id @default(cuid())
+  larpScriptId          String?
+  larpShopId            String
+  startTime             DateTime?
+  endTime               DateTime?
+  standardPrice         Decimal?
+  expectedTimeStart     DateTime?
+  expectedTimeEnd       DateTime?
+  isAssistingScheduling Boolean                 @default(false)
+  desiredDuration       Decimal?
+  isPaid                Boolean                 @default(false)
+  status                String                  @default("")
+  createTime            DateTime                @default(now())
+  createBy              String                  @default("SYS")
+  lastUpdateTime        DateTime                @updatedAt
+  lastUpdateBy          String                  @default("SYS")
+  lastUpdateCode        String                  @default("I")
+  larpScript            LARPScript?             @relation(fields: [larpScriptId], references: [id])
+  larpShop              LARPShop                @relation(fields: [larpShopId], references: [id])
+  participants          PlayersInLARPSessions[]
+  dms                   DMsInLARPSessions[]
+  timeSlots             TimeSlot[]
+}
+
+model DMsInLARPSessions {
+  id             String      @id @default(cuid())
+  larpSessionId  String
+  userId         String
+  status         String      @default("")
+  createTime     DateTime    @default(now())
+  createBy       String      @default("SYS")
+  lastUpdateTime DateTime    @updatedAt
+  lastUpdateBy   String      @default("SYS")
+  lastUpdateCode String      @default("I")
+  larpSession    LARPSession @relation(fields: [larpSessionId], references: [id])
+  user           User        @relation(fields: [userId], references: [id])
+}
+
+model TimeSlot {
+  id                           String                        @id @default(cuid())
+  lARPSessionId                String
+  startTime                    DateTime
+  endTime                      DateTime
+  lARPSession                  LARPSession                   @relation(fields: [lARPSessionId], references: [id])
+  playersAvalabilityInTimeSlot PlayerAvalabilityInTimeSlot[]
+}
+
+model PlayerAvalabilityInTimeSlot {
+  id                      String                 @id @default(cuid())
+  timeSlotId              String
+  isAvailable             Boolean
+  playersInLARPSessionsId String
+  timeSlot                TimeSlot               @relation(fields: [timeSlotId], references: [id])
+  playersInLARPSessions   PlayersInLARPSessions? @relation(fields: [playersInLARPSessionsId], references: [id])
+}
+
+model PlayersInLARPSessions {
+  id                          String                        @id @default(cuid())
+  larpSessionId               String
+  userId                      String
+  price                       Decimal                       @default(0)
+  paidAmount                  Decimal                       @default(0)
+  paymentStatus               String                        @default("")
+  attendanceStatus            String                        @default("")
+  status                      String                        @default("")
+  schedulingStatus            String                        @default("")
+  createTime                  DateTime                      @default(now())
+  createBy                    String                        @default("SYS")
+  lastUpdateTime              DateTime                      @updatedAt
+  lastUpdateBy                String                        @default("SYS")
+  lastUpdateCode              String                        @default("I")
+  larpSession                 LARPSession                   @relation(fields: [larpSessionId], references: [id])
+  user                        User                          @relation(fields: [userId], references: [id])
+  playerAvalabilityInTimeSlot PlayerAvalabilityInTimeSlot[]
+}
+
+model OTP {
+  phoneNumber String
+  otp         String   @unique
+  expireAt    DateTime
+  createTime  DateTime @default(now())
+
+  @@unique([phoneNumber, otp])
+}
+
+model Coupon {
+  id             String   @id @default(cuid())
+  userId         String
+  type           String
+  status         String
+  createTime     DateTime @default(now())
+  createBy       String   @default("SYS")
+  lastUpdateTime DateTime @updatedAt
+  lastUpdateBy   String   @default("SYS")
+  lastUpdateCode String   @default("I")
+  user           User     @relation(fields: [userId], references: [id])
+}
+
+model StampCard {
+  id               String   @id @default(cuid())
+  userId           String
+  type             String
+  accumulatedCount Int
+  createTime       DateTime @default(now())
+  createBy         String   @default("SYS")
+  lastUpdateTime   DateTime @updatedAt
+  lastUpdateBy     String   @default("SYS")
+  lastUpdateCode   String   @default("I")
+  user             User     @relation(fields: [userId], references: [id])
+}
+
+model Comment {
+  id                    String  @id @default(cuid())
+  userId                String?
+  larpScriptId          String?
+  larpShopId            String?
+  larpScriptCharacterId String?
+
+  content        String
+  inferenceScore Decimal?
+
+  plotScore       Decimal?
+  complexScore    Decimal?
+  likeCount       Int      @default(0)
+  commentCount    Int      @default(0)
+  likeStatus      String?
+  anonymousStatus String?
+  recommandDegree Int?
+
+  createTime     DateTime @default(now())
+  createBy       String   @default("SYS")
+  lastUpdateTime DateTime @updatedAt
+  lastUpdateBy   String   @default("SYS")
+  lastUpdateCode String   @default("I")
+
+  likes               CommentsLikedByUsers[]
+  comments            CommentsCommented[]    @relation("ParentComments")
+  commentedOn         CommentsCommented[]    @relation("ChildComments")
+  media               Media[]
+  user                User?                  @relation(fields: [userId], references: [id])
+  larpScript          LARPScript?            @relation(fields: [larpScriptId], references: [id])
+  larpShop            LARPShop?              @relation(fields: [larpShopId], references: [id])
+  larpScriptCharacter LarpScriptCharacter?   @relation(fields: [larpScriptCharacterId], references: [id])
+}
+
+model CommentsLikedByUsers {
+  id        String  @id @default(cuid())
+  userId    String
+  commentId String
+  user      User    @relation(fields: [userId], references: [id])
+  comment   Comment @relation(fields: [commentId], references: [id])
+}
+
+model CommentsCommented {
+  id              String @id @default(cuid())
+  parentCommentId String
+  childCommentId  String
+
+  parentComment Comment @relation("ParentComments", fields: [parentCommentId], references: [id])
+  childComment  Comment @relation("ChildComments", fields: [childCommentId], references: [id])
+}
+
+model Media {
+  id        String   @id @default(cuid())
+  url       String
+  Comment   Comment? @relation(fields: [commentId], references: [id])
+  commentId String?
+}
