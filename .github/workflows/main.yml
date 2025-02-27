@@ -1,23 +1,55 @@
 name: Scheduled Main Job
+
 on:
   schedule:
     - cron: "0 * * * *" # Runs hourly
+
 jobs:
   build:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
         with:
           python-version: "3.x"
-      - run: pip install -r requirements.txt
-      - run: python3 -m prisma generate
-      - run: python main.py
-      - run: |
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Generate Prisma client
+        run: python3 -m prisma generate
+        env:
+          PRISMA_API_URL: ${{ secrets.PRISMA_API_URL }}
+          PRISMA_API_KEY: ${{ secrets.PRISMA_API_KEY }}
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+
+      - name: Run main script
+        run: python main.py
+        env:
+          # Cloudinary Configuration for LARP Script Covers
+          CLOUDINARY_COVER_CLOUD_NAME: ${{ secrets.CLOUDINARY_COVER_CLOUD_NAME }}
+          CLOUDINARY_COVER_API_KEY: ${{ secrets.CLOUDINARY_COVER_API_KEY }}
+          CLOUDINARY_COVER_API_SECRET: ${{ secrets.CLOUDINARY_COVER_API_SECRET }}
+          # Cloudinary Configuration for LARP Script Image Content
+          CLOUDINARY_CONTENT_CLOUD_NAME: ${{ secrets.CLOUDINARY_CONTENT_CLOUD_NAME }}
+          CLOUDINARY_CONTENT_API_KEY: ${{ secrets.CLOUDINARY_CONTENT_API_KEY }}
+          CLOUDINARY_CONTENT_API_SECRET: ${{ secrets.CLOUDINARY_CONTENT_API_SECRET }}
+          # Prisma Configuration
+          PRISMA_API_URL: ${{ secrets.PRISMA_API_URL }}
+          PRISMA_API_KEY: ${{ secrets.PRISMA_API_KEY }}
+          # Other
+          HOST: ${{ secrets.HOST }}
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+
+      - name: Commit and push changes
+        run: |
           git config user.name "GitHub Action"
           git config user.email "action@github.com"
           git add .
-          git commit -m "Update data from cron job"
+          git commit -m "Update data from cron job" || echo "No changes to commit"
           git push
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
