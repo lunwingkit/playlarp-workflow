@@ -22,8 +22,6 @@ jobs:
       - name: Generate Prisma client
         run: python3 -m prisma generate
         env:
-          PRISMA_API_URL: ${{ secrets.PRISMA_API_URL }}
-          PRISMA_API_KEY: ${{ secrets.PRISMA_API_KEY }}
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
 
       - name: Run main script
@@ -37,11 +35,7 @@ jobs:
           CLOUDINARY_CONTENT_CLOUD_NAME: ${{ secrets.CLOUDINARY_CONTENT_CLOUD_NAME }}
           CLOUDINARY_CONTENT_API_KEY: ${{ secrets.CLOUDINARY_CONTENT_API_KEY }}
           CLOUDINARY_CONTENT_API_SECRET: ${{ secrets.CLOUDINARY_CONTENT_API_SECRET }}
-          # Prisma Configuration
-          PRISMA_API_URL: ${{ secrets.PRISMA_API_URL }}
-          PRISMA_API_KEY: ${{ secrets.PRISMA_API_KEY }}
           # Other
-          HOST: ${{ secrets.HOST }}
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
 
       - name: Commit and push changes
