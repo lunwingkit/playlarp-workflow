@@ -181,7 +181,7 @@ if __name__ == "__main__":
             if start_step < 1 or start_step > 6:
                 raise ValueError("start_step must be between 1 and 6")
         except ValueError as e:
-            print(f"Error: {e}. Using default start_step=2")
-            start_step = 2
+            print(f"Error: {e}. Using default start_step=1")
+            start_step = 1
     main(mode='incremental', log_level='INFO', start_step=start_step)
     logging.info(f"Cron job execution completed from step {start_step}")
