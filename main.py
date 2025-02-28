@@ -189,8 +189,8 @@ def main(mode='incremental', log_level='INFO', start_step=1, fetch_images=True, 
 
 if __name__ == "__main__":
     mode = 'incremental'
-    start_step = 2
-    log_level = 'DEBUG'  # Set to DEBUG for detailed logs
+    start_step = 1
+    log_level = 'INFO'  # Set to DEBUG for detailed logs
     fetch_images = True
     upload_images = True
 
