@@ -12,8 +12,15 @@ def read_csv(file_path):
         reader = csv.DictReader(f)
         return list(reader)
 
-def write_csv(file_path, data, fieldnames):
-    """Write data to CSV with given fieldnames."""
+def write_csv(file_path, data, fieldnames=None):
+    """Write data to CSV with given or dynamically determined fieldnames."""
+    if not data:
+        return
+    if fieldnames is None:
+        all_keys = set()
+        for row in data:
+            all_keys.update(row.keys())  # Collect all unique keys from all rows
+        fieldnames = sorted(all_keys)  # Sort for consistency
     with open(file_path, 'w', newline='', encoding='utf-8') as f:
         writer = csv.DictWriter(f, fieldnames=fieldnames, extrasaction='ignore')
         writer.writeheader()
@@ -92,8 +99,7 @@ def update_script_details(new_details, mode='full'):
         inserted_count = len(new_details)
     
     if all_data:
-        fieldnames = ['scriptId', 'scriptName', 'firstFetchAt', 'lastModifiedAt', 'scriptCoverUrl', 'scriptImageContent']
-        write_csv(detailed_csv_path, all_data, fieldnames)
+        write_csv(detailed_csv_path, all_data)  # No fieldnames specified, uses all keys
         sort_csv_by_script_id(detailed_csv_path)
     return inserted_count
 

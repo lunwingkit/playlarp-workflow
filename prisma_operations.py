@@ -1,5 +1,3 @@
-# prisma_operations.py
-
 import csv
 import logging
 import os
@@ -8,14 +6,16 @@ from prisma import Prisma
 from datetime import datetime
 import config
 import prisma.models  # Import generated models
+import asyncio
+from concurrent.futures import ThreadPoolExecutor
 
-# Set up logging
+# Set up logging (will be overridden by main.py's setup_logger)
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 class PrismaOperations:
     def __init__(self):
-        self.prisma = Prisma(auto_register=True)  # Auto-register models from prisma.models
+        self.prisma = Prisma(auto_register=True)
 
     async def connect(self):
         await self.prisma.connect()
@@ -25,14 +25,10 @@ class PrismaOperations:
 
     async def get_max_seq_no(self) -> int:
         """Fetch the largest seqNo from the LARPScript table."""
-        # Fetch all scripts with seqNo, order by seqNo descending, take the first one
-        scripts = await self.prisma.larpscript.find_many(
-            order={'seqNo': 'desc'},
-            take=1
-        )
+        scripts = await self.prisma.larpscript.find_many(order={'seqNo': 'desc'}, take=1)
         if scripts and scripts[0].seqNo is not None:
             return scripts[0].seqNo
-        return 0  # Return 0 if no scripts or seqNo is None
+        return 0
 
     async def upsert_larp_script(self, row: Dict[str, str], seq_no: int) -> bool:
         """Upsert a LARPScript record based on CSV row data."""
@@ -45,7 +41,7 @@ class PrismaOperations:
             female_player_count = int(row.get('scriptFemalePlayerLimit', '0') or '0')
             duration_in_hour = float(row.get('groupDuration', '0') or '0') / 60
             issue_time_str = row.get('scriptIssueUnitTime', '')
-            issue_time = datetime.fromtimestamp(int(issue_time_str)) if issue_time_str else None
+            issue_time = datetime.fromtimestamp(int(issue_time_str)) if issue_time_str and issue_time_str.isdigit() else None
             mq_script_id = row['scriptId']
             mq_collective_score = float(row.get('scriptScore', '0') or '0')
             mq_score_count = int(row.get('scriptScoreCount', '0') or '0')
@@ -56,7 +52,6 @@ class PrismaOperations:
             mq_script_image_content = row.get('scriptImageContent', '')
             played_count = int(row.get('scriptPlayedCount', '0') or '0')
 
-            # Tags and difficulty
             script_tags = row.get('scriptTag', '').split('@')
             script_tags = [tag for tag in script_tags if tag and tag != '其他']
             difficulty = row.get('scriptDifficultyDegreeName', '')
@@ -87,7 +82,6 @@ class PrismaOperations:
                 file_extension = row['scriptCoverUrl'].split('.').pop()
                 image_url = f"{mq_script_id}.{file_extension}"
 
-            # Prepare data for upsert
             update_data = {
                 'name': script_name,
                 'imageUrl': image_url,
@@ -121,15 +115,10 @@ class PrismaOperations:
                 'seqNo': seq_no,
             }
 
-            # Upsert LARPScript
-            script = await self.prisma.larpscript.upsert(
+            await self.prisma.larpscript.upsert(
                 where={'mqScriptId': mq_script_id},
-                data={
-                    'update': update_data,
-                    'create': create_data
-                }
+                data={'update': update_data, 'create': create_data}
             )
-            logger.info(f"Script upserted successfully for scriptId: {script_id}")
             return True
         except Exception as e:
             logger.error(f"Error upserting scriptId {script_id}: {e}")
@@ -141,13 +130,11 @@ class PrismaOperations:
         issue_info_items = row.get('scriptIssueInfoItems', '')
 
         if not issue_info_items or issue_info_items.strip() == '':
-            logger.info(f"No issue or author info for scriptId: {script_id}")
             return
 
         issue_items = [item.strip() for item in issue_info_items.split(',')]
         script = await self.prisma.larpscript.find_unique(where={'mqScriptId': script_id})
         if not script:
-            logger.error(f"Script not found for scriptId: {script_id}")
             return
 
         for item in issue_items:
@@ -156,68 +143,72 @@ class PrismaOperations:
                 unit_id = id_bracket.replace('(', '').replace(')', '')
 
                 if unit_id == 'None':
-                    # Handle authors
                     authors = [a.strip() for a in name.split('&')]
                     for author in authors:
                         author_record = await self.prisma.larpscriptauthor.upsert(
                             where={'name': author},
                             data={'create': {'name': author}, 'update': {}}
                         )
-                        logger.info(f"Upserted author: {author}")
                         await self.prisma.larpscriptswrittenbyauthors.upsert(
                             where={'scriptId_authorId': {'scriptId': script.id, 'authorId': author_record.id}},
                             data={'create': {'scriptId': script.id, 'authorId': author_record.id}, 'update': {}}
                         )
-                        logger.info(f"Linked author {author} to scriptId: {script_id}")
                 else:
-                    # Handle issuer
                     issuer_record = await self.prisma.larpscriptissuer.upsert(
                         where={'mqIssueUnitId': unit_id},
-                        data={
-                            'create': {'mqIssueUnitId': unit_id, 'name': name, 'intro': ''},
-                            'update': {}
-                        }
+                        data={'create': {'mqIssueUnitId': unit_id, 'name': name, 'intro': ''}, 'update': {}}
                     )
-                    logger.info(f"Upserted issuer: {name} with id: {unit_id}")
                     await self.prisma.larpscriptsissuedbyissuers.upsert(
                         where={'scriptId_issuerId': {'scriptId': script.id, 'issuerId': issuer_record.id}},
                         data={'create': {'scriptId': script.id, 'issuerId': issuer_record.id}, 'update': {}}
                     )
-                    logger.info(f"Linked issuer {name} (ID: {unit_id}) to scriptId: {script_id}")
             except Exception as e:
                 logger.error(f"Error processing issue item '{item}' for scriptId {script_id}: {e}")
 
-async def import_scripts_and_relations(new_details: List[Dict[str, str]]):
-    """Import only new scripts and their issuers/authors into Prisma database."""
+    async def process_script(self, row: Dict[str, str], seq_no: int, index: int, total: int):
+        """Process a single script with logging."""
+        script_id = row['scriptId']
+        script_name = row['scriptName']
+        logger.info(f"{index + 1}/{total}: {script_id} {script_name}")
+        success = await self.upsert_larp_script(row, seq_no)
+        if success:
+            await self.upsert_issuers_and_authors(row)
+        return success
+
+async def import_scripts_and_relations(new_details: List[Dict[str, str]], max_concurrency: int = 50):
+    """Import scripts and their issuers/authors into Prisma database in parallel."""
     prisma_ops = PrismaOperations()
     await prisma_ops.connect()
 
     total_rows = len(new_details)
-    upsert_count = 0
-    failed_count = 0
-    failed_scripts = []
+    if total_rows == 0:
+        logger.info("No scripts to upsert.")
+        await prisma_ops.disconnect()
+        return
 
-    # Get max seqNo
     max_seq_no = await prisma_ops.get_max_seq_no()
     current_seq_no = max_seq_no
 
-    for index, row in enumerate(new_details):
-        logger.info(f"Processing {index + 1}/{total_rows}: scriptId {row['scriptId']}")
-        current_seq_no += 1
-        success = await prisma_ops.upsert_larp_script(row, current_seq_no)
-        if success:
-            upsert_count += 1
-            await prisma_ops.upsert_issuers_and_authors(row)
-        else:
-            failed_count += 1
-            failed_scripts.append({'scriptId': row['scriptId'], 'scriptName': row['scriptName']})
+    semaphore = asyncio.Semaphore(max_concurrency)
+
+    async def sem_task(row, seq_no, index):
+        async with semaphore:
+            return await prisma_ops.process_script(row, seq_no, index, total_rows)
+
+    # Create tasks for all rows
+    tasks = [
+        sem_task(row, current_seq_no + i + 1, i)
+        for i, row in enumerate(new_details)
+    ]
+
+    # Execute tasks in parallel and gather results
+    results = await asyncio.gather(*tasks, return_exceptions=True)
+
+    upsert_count = sum(1 for result in results if result is True)
+    failed_count = total_rows - upsert_count
 
     logger.info(f"Success: {upsert_count} rows upserted.")
     logger.info(f"Failed: {failed_count} rows.")
-    if failed_scripts:
-        logger.info("Failed scripts:")
-        for script in failed_scripts:
-            logger.info(f"scriptId: {script['scriptId']}, scriptName: {script['scriptName']}")
 
     await prisma_ops.disconnect()
 

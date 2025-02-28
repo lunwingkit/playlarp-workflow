@@ -193,13 +193,8 @@ async def fetch_script_detail(session, url, script_id, index, total):
                 data = await response.json()
                 if data and isinstance(data, dict) and 'data' in data:
                     current_time = int(time.time())
-                    detail = {
-                        'scriptId': data['data'].get('scriptId', ''),
-                        'scriptName': data['data'].get('scriptName', ''),
-                        'scriptCoverUrl': data['data'].get('scriptCoverUrl', ''),
-                        'scriptImageContent': data['data'].get('scriptImageContent', ''),
-                        'lastModifiedAt': current_time,
-                    }
+                    detail = data['data'].copy()  # Copy all fields from the API response
+                    detail['lastModifiedAt'] = current_time  # Add local timestamp
                     return detail
                 else:
                     logging.warning(f"[{index}/{total}] Invalid response for scriptId={script_id}")

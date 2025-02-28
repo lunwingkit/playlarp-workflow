@@ -6,3 +6,4 @@ cloudinary
 brotli
 aiohttp
 prisma
+python-dotenv

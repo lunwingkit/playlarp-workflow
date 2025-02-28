@@ -1,8 +1,6 @@
 # Ignore output and log directories
-downloaded/
-output_raw/
-output_translated/
 log/
 venv/
-__pycache__/
 .env
+data/downloaded/
+__pycache__/

@@ -1,5 +1,8 @@
 # config.py
 import os
+from dotenv import load_dotenv
+
+load_dotenv()  # Load environment variables from .env file
 
 # Cloudinary Configuration for LARP Script Covers
 CLOUDINARY_COVER_CLOUD_NAME = os.getenv("CLOUDINARY_COVER_CLOUD_NAME")
