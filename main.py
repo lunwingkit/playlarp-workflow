@@ -174,7 +174,7 @@ def main(mode='incremental', log_level='INFO', start_step=1):
 
 if __name__ == "__main__":
     import sys
-    start_step = 3  # Default to step 2
+    start_step = 1  # Default to step 2
     if len(sys.argv) > 1:
         try:
             start_step = int(sys.argv[1])
