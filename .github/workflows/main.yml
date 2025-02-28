@@ -49,4 +49,9 @@ jobs:
           git config user.email "action@github.com"
           git add .
           git commit -m "Update data from cron job" || echo "No changes to commit"
-          git push
+          if [ -n "$(git status --porcelain)" ]; then
+            git pull --rebase origin main
+            git push
+          else
+            echo "No changes to push"
+          fi
