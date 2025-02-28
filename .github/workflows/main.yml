@@ -10,6 +10,8 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }} # Use the GITHUB_TOKEN explicitly
 
       - name: Set up Python
         uses: actions/setup-python@v5
@@ -27,15 +29,12 @@ jobs:
       - name: Run main script
         run: python main.py
         env:
-          # Cloudinary Configuration for LARP Script Covers
           CLOUDINARY_COVER_CLOUD_NAME: ${{ secrets.CLOUDINARY_COVER_CLOUD_NAME }}
           CLOUDINARY_COVER_API_KEY: ${{ secrets.CLOUDINARY_COVER_API_KEY }}
           CLOUDINARY_COVER_API_SECRET: ${{ secrets.CLOUDINARY_COVER_API_SECRET }}
-          # Cloudinary Configuration for LARP Script Image Content
           CLOUDINARY_CONTENT_CLOUD_NAME: ${{ secrets.CLOUDINARY_CONTENT_CLOUD_NAME }}
           CLOUDINARY_CONTENT_API_KEY: ${{ secrets.CLOUDINARY_CONTENT_API_KEY }}
           CLOUDINARY_CONTENT_API_SECRET: ${{ secrets.CLOUDINARY_CONTENT_API_SECRET }}
-          # Other
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
 
       - name: Commit and push changes
@@ -45,5 +44,3 @@ jobs:
           git add .
           git commit -m "Update data from cron job" || echo "No changes to commit"
           git push
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
